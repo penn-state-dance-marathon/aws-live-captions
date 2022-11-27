@@ -15,9 +15,10 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package com.amazonaws.transcribestreaming;
+package org.thon.transcribestreaming;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -27,17 +28,32 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.DataLine;
+import javax.sound.sampled.Mixer;
+import javax.sound.sampled.TargetDataLine;
+import javax.swing.JComboBox;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.plaf.DimensionUIResource;
+
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
@@ -65,6 +81,7 @@ public class FullScreenWindowController {
     private Button startStopMicButton;
     // private Button fileStreamButton;
     private Button exitButton;
+    private ComboBox<Mixer.Info> audioInputSelect;
     // private Button saveButton;
     // private TextArea finalTextArea;
     private CompletableFuture<Void> inProgressStreamingRequest;
@@ -74,10 +91,10 @@ public class FullScreenWindowController {
     private ScheduledExecutorService scheduler;
 
     public FullScreenWindowController(Stage primaryStage) {
-        client = new TranscribeStreamingClientWrapper();
-        synchronousClient = new TranscribeStreamingSynchronousClient(TranscribeStreamingClientWrapper.getClient());
         this.primaryStage = primaryStage;
         initializeWindow(primaryStage);
+        client = new TranscribeStreamingClientWrapper(getSelectedAudioInput());
+        synchronousClient = new TranscribeStreamingSynchronousClient(TranscribeStreamingClientWrapper.getClient());
         startTimeoutThread();
     }
 
@@ -114,9 +131,22 @@ public class FullScreenWindowController {
             finalTranscript = "";
             startStopMicButton.setText("Connecting...");
             startStopMicButton.setDisable(true);
+            audioInputSelect.setDisable(true);
             outputText.setText("");
             // TODO: Make it so old text doesn't show up
             inProgressStreamingRequest = client.startTranscription(getResponseHandlerForWindow(), inputFile);
+            inProgressStreamingRequest.handle((result, exc) -> {
+                if (exc != null) {
+                    JOptionPane.showMessageDialog(null, 
+                        "WARNING! A fatal error occured. See the log for more details. \n" +
+                        exc.getMessage());
+                    startStopMicButton.setText("START TRANSCRIPTION");
+                    startStopMicButton.setOnAction(__ -> startTranscriptionRequest(null));
+                    startStopMicButton.setDisable(false);
+                    audioInputSelect.setDisable(false);
+                }
+                return result;
+            });
         }
     }
 
@@ -153,6 +183,17 @@ public class FullScreenWindowController {
             primaryStage.hide();
         });
 
+        audioInputSelect = new ComboBox<>();
+        audioInputSelect.setStyle("-fx-font: 20px \"Gill Sans MT\";");
+        audioInputSelect.setCellFactory(new MixerRenderer());
+        updateAudioInputDropdown();
+        audioInputSelect.valueProperty().addListener(new ChangeListener<Mixer.Info>() {
+            public void changed(javafx.beans.value.ObservableValue<? extends Mixer.Info> arg0, Mixer.Info arg1, Mixer.Info arg2) {
+                client = new TranscribeStreamingClientWrapper(getSelectedAudioInput());
+                synchronousClient = new TranscribeStreamingSynchronousClient(TranscribeStreamingClientWrapper.getClient());
+            };
+        });
+
         FlowPane bottomPane = new FlowPane();
         bottomPane.setPrefWidth(width);
         bottomPane.setPrefHeight(height - 50);
@@ -175,7 +216,20 @@ public class FullScreenWindowController {
         list.addAll(outputText);
         
         ObservableList<Node> rootList = rootPane.getChildren();
-        rootList.addAll(startStopMicButton, exitButton, bottomPane);
+        rootList.addAll(startStopMicButton, exitButton, audioInputSelect, bottomPane);
+    }
+
+    private void updateAudioInputDropdown() {
+        List<Mixer.Info> audioInputList = getAudioInputList();
+        audioInputSelect.getItems().clear();
+        audioInputSelect.getItems().addAll(audioInputList);
+        if (audioInputList.size() > 0) {
+            audioInputSelect.setValue(audioInputList.get(0));
+        }
+    }
+
+    public Mixer.Info getSelectedAudioInput() {
+        return audioInputSelect.getValue();
     }
 
     private void stopTranscription() {
@@ -191,6 +245,7 @@ public class FullScreenWindowController {
                 startStopMicButton.setText("START TRANSCRIPTION");
                 startStopMicButton.setOnAction(__ -> startTranscriptionRequest(null));
                 startStopMicButton.setDisable(false);
+                audioInputSelect.setDisable(false);
             }
 
         }
@@ -283,6 +338,7 @@ public class FullScreenWindowController {
             @Override
             public void onComplete() {
                 System.out.println("=== All records streamed successfully ===");
+                audioInputSelect.setDisable(false);
                 // Platform.runLater(() -> {
                 //     // finalTextArea.setText(finalTranscript);
                 //     // saveButton.setDisable(false);
@@ -304,6 +360,24 @@ public class FullScreenWindowController {
                 // });
             }
         };
+    }
+
+    /**
+     * @return a list of system audio inputs
+     */
+    private static List<Mixer.Info> getAudioInputList() {
+        List<Mixer.Info> result = new ArrayList<>();
+        int sampleRate = 16000;
+        AudioFormat format = new AudioFormat(sampleRate, 16, 1, true, false);
+        DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
+
+        for (Mixer.Info mx : AudioSystem.getMixerInfo()) {
+            if (AudioSystem.getMixer(mx).isLineSupported(info)) {
+                result.add(mx);
+            }
+        }
+
+        return result;
     }
 
 }
