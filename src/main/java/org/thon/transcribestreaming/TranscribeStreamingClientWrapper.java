@@ -30,6 +30,7 @@ import software.amazon.awssdk.services.transcribestreaming.model.AudioStream;
 import software.amazon.awssdk.services.transcribestreaming.model.LanguageCode;
 import software.amazon.awssdk.services.transcribestreaming.model.MediaEncoding;
 import software.amazon.awssdk.services.transcribestreaming.model.StartStreamTranscriptionRequest;
+import software.amazon.awssdk.services.transcribestreaming.model.VocabularyFilterMethod;
 
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
@@ -49,8 +50,10 @@ import java.net.URISyntaxException;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * This wraps the TranscribeStreamingAsyncClient with easier to use methods for quicker integration with the GUI. This
- * also provides examples on how to handle the various exceptions that can be thrown and how to implement a request
+ * This wraps the TranscribeStreamingAsyncClient with easier to use methods for
+ * quicker integration with the GUI. This
+ * also provides examples on how to handle the various exceptions that can be
+ * thrown and how to implement a request
  * stream for input to the streaming service.
  */
 public class TranscribeStreamingClientWrapper {
@@ -69,8 +72,9 @@ public class TranscribeStreamingClientWrapper {
     }
 
     public static TranscribeStreamingAsyncClient getClient() {
-        Region region = getRegion();
-        String endpoint = "https://transcribestreaming." + region.toString().toLowerCase().replace('_','-') + ".amazonaws.com";
+        Region region = Region.US_EAST_2;
+        String endpoint = "https://transcribestreaming." + region.toString().toLowerCase().replace('_', '-')
+                + ".amazonaws.com";
         try {
             return TranscribeStreamingAsyncClient.builder()
                     .credentialsProvider(getCredentials())
@@ -97,19 +101,24 @@ public class TranscribeStreamingClientWrapper {
     }
 
     /**
-     * Start real-time speech recognition. Transcribe streaming java client uses Reactive-streams interface.
-     * For reference on Reactive-streams: https://github.com/reactive-streams/reactive-streams-jvm
+     * Start real-time speech recognition. Transcribe streaming java client uses
+     * Reactive-streams interface.
+     * For reference on Reactive-streams:
+     * https://github.com/reactive-streams/reactive-streams-jvm
      *
-     * @param responseHandler StartStreamTranscriptionResponseHandler that determines what to do with the response
-     *                        objects as they are received from the streaming service
-     * @param inputFile optional input file to stream audio from. Will stream from the microphone if this is set to null
+     * @param responseHandler StartStreamTranscriptionResponseHandler that
+     *                        determines what to do with the response
+     *                        objects as they are received from the streaming
+     *                        service
+     * @param inputFile       optional input file to stream audio from. Will stream
+     *                        from the microphone if this is set to null
      */
     public CompletableFuture<Void> startTranscription(StreamTranscriptionBehavior responseHandler, File inputFile) {
         if (requestStream != null) {
             throw new IllegalStateException("Stream is already open");
         }
         try {
-            int sampleRate = 16_000; //default
+            int sampleRate = 16_000; // default
             if (inputFile != null) {
                 sampleRate = (int) AudioSystem.getAudioInputStream(inputFile).getFormat().getSampleRate();
                 requestStream = new AudioStreamPublisher(getStreamFromFile(inputFile));
@@ -117,11 +126,11 @@ public class TranscribeStreamingClientWrapper {
                 requestStream = new AudioStreamPublisher(getStreamFromMic(audioInput));
             }
             return client.startStreamTranscription(
-                    //Request parameters. Refer to API documentation for details.
+                    // Request parameters. Refer to API documentation for details.
                     getRequest(sampleRate),
-                    //AudioEvent publisher containing "chunks" of audio data to transcribe
+                    // AudioEvent publisher containing "chunks" of audio data to transcribe
                     requestStream,
-                    //Defines what to do with transcripts as they arrive from the service
+                    // Defines what to do with transcripts as they arrive from the service
                     responseHandler);
         } catch (LineUnavailableException | UnsupportedAudioFileException | IOException ex) {
             CompletableFuture<Void> failedFuture = new CompletableFuture<>();
@@ -131,7 +140,8 @@ public class TranscribeStreamingClientWrapper {
     }
 
     /**
-     * Stop in-progress transcription if there is one in progress by closing the request stream
+     * Stop in-progress transcription if there is one in progress by closing the
+     * request stream
      */
     public void stopTranscription() {
         if (requestStream != null) {
@@ -162,8 +172,10 @@ public class TranscribeStreamingClientWrapper {
 
     /**
      * Build an input stream from a microphone if one is present.
+     * 
      * @return InputStream containing streaming audio from system's microphone
-     * @throws LineUnavailableException When a microphone is not detected or isn't properly working
+     * @throws LineUnavailableException When a microphone is not detected or isn't
+     *                                  properly working
      */
     private static InputStream getStreamFromMic() throws LineUnavailableException {
 
@@ -208,6 +220,7 @@ public class TranscribeStreamingClientWrapper {
 
     /**
      * Build an input stream from an audio file
+     * 
      * @param inputFile Name of the file containing audio to transcribe
      * @return InputStream built from reading the file's audio
      */
@@ -220,23 +233,32 @@ public class TranscribeStreamingClientWrapper {
     }
 
     /**
-     * Build StartStreamTranscriptionRequestObject containing required parameters to open a streaming transcription
+     * Build StartStreamTranscriptionRequestObject containing required parameters to
+     * open a streaming transcription
      * request, such as audio sample rate and language spoken in audio
-     * @param mediaSampleRateHertz sample rate of the audio to be streamed to the service in Hertz
-     * @return StartStreamTranscriptionRequest to be used to open a stream to transcription service
+     * 
+     * @param mediaSampleRateHertz sample rate of the audio to be streamed to the
+     *                             service in Hertz
+     * @return StartStreamTranscriptionRequest to be used to open a stream to
+     *         transcription service
      */
     private StartStreamTranscriptionRequest getRequest(Integer mediaSampleRateHertz) {
         return StartStreamTranscriptionRequest.builder()
                 .languageCode(LanguageCode.EN_US.toString())
                 .mediaEncoding(MediaEncoding.PCM)
                 .mediaSampleRateHertz(mediaSampleRateHertz)
+                .vocabularyFilterMethod(VocabularyFilterMethod.REMOVE)
+                .vocabularyFilterName("profanity")
+                .vocabularyName("famcarn-test01")
                 .build();
     }
 
     /**
-     * @return AWS credentials to be used to connect to Transcribe service. This example uses the default credentials
-     * provider, which looks for environment variables (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY) or a credentials
-     * file on the system running this program.
+     * @return AWS credentials to be used to connect to Transcribe service. This
+     *         example uses the default credentials
+     *         provider, which looks for environment variables (AWS_ACCESS_KEY_ID
+     *         and AWS_SECRET_ACCESS_KEY) or a credentials
+     *         file on the system running this program.
      */
     private static AwsCredentialsProvider getCredentials() {
         return DefaultCredentialsProvider.create();

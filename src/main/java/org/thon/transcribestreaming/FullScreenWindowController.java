@@ -65,8 +65,10 @@ import software.amazon.awssdk.services.transcribestreaming.model.TranscriptEvent
 import software.amazon.awssdk.services.transcribestreaming.model.TranscriptResultStream;
 
 /**
- * This class primarily controls the GUI for this application. Most of the code relevant to starting and working
- * with our streaming API can be found in TranscribeStreamingClientWrapper.java, with the exception of some result
+ * This class primarily controls the GUI for this application. Most of the code
+ * relevant to starting and working
+ * with our streaming API can be found in TranscribeStreamingClientWrapper.java,
+ * with the exception of some result
  * parsing logic in this classes method getResponseHandlerForWindow()
  */
 public class FullScreenWindowController {
@@ -76,8 +78,10 @@ public class FullScreenWindowController {
     private static final int SECONDS_TO_DISAPPEAR = 3;
 
     private TranscribeStreamingClientWrapper client;
+    private TranslateClientWrapper translateClient;
     private TranscribeStreamingSynchronousClient synchronousClient;
     private Text outputText;
+    private Text outputTranslation;
     private Button startStopMicButton;
     // private Button fileStreamButton;
     private Button exitButton;
@@ -86,6 +90,7 @@ public class FullScreenWindowController {
     // private TextArea finalTextArea;
     private CompletableFuture<Void> inProgressStreamingRequest;
     private String finalTranscript = "";
+    private String finalTranslation = "";
     private Date lastUpdatedTime;
     private Stage primaryStage;
     private ScheduledExecutorService scheduler;
@@ -95,6 +100,7 @@ public class FullScreenWindowController {
         initializeWindow(primaryStage);
         client = new TranscribeStreamingClientWrapper(getSelectedAudioInput());
         synchronousClient = new TranscribeStreamingSynchronousClient(TranscribeStreamingClientWrapper.getClient());
+        translateClient = new TranslateClientWrapper();
         startTimeoutThread();
     }
 
@@ -133,13 +139,14 @@ public class FullScreenWindowController {
             startStopMicButton.setDisable(true);
             audioInputSelect.setDisable(true);
             outputText.setText("");
+            outputTranslation.setText("");
             // TODO: Make it so old text doesn't show up
             inProgressStreamingRequest = client.startTranscription(getResponseHandlerForWindow(), inputFile);
             inProgressStreamingRequest.handle((result, exc) -> {
                 if (exc != null) {
-                    JOptionPane.showMessageDialog(null, 
-                        "WARNING! A fatal error occured. See the log for more details. \n" +
-                        exc.getMessage());
+                    JOptionPane.showMessageDialog(null,
+                            "WARNING! A fatal error occured. See the log for more details. \n" +
+                                    exc.getMessage());
                     startStopMicButton.setText("START TRANSCRIPTION");
                     startStopMicButton.setOnAction(__ -> startTranscriptionRequest(null));
                     startStopMicButton.setDisable(false);
@@ -163,8 +170,7 @@ public class FullScreenWindowController {
         rootPane.setPadding(new Insets(15, 25, 25, 25));
         BackgroundFill fill = new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, Insets.EMPTY);
         rootPane.setBackground(new Background(fill));
-        
-        
+
         int width = (int) Screen.getPrimary().getBounds().getWidth();
         int height = (int) Screen.getPrimary().getBounds().getHeight();
         Scene scene = new Scene(rootPane, width, height);
@@ -188,9 +194,11 @@ public class FullScreenWindowController {
         audioInputSelect.setCellFactory(new MixerRenderer());
         updateAudioInputDropdown();
         audioInputSelect.valueProperty().addListener(new ChangeListener<Mixer.Info>() {
-            public void changed(javafx.beans.value.ObservableValue<? extends Mixer.Info> arg0, Mixer.Info arg1, Mixer.Info arg2) {
+            public void changed(javafx.beans.value.ObservableValue<? extends Mixer.Info> arg0, Mixer.Info arg1,
+                    Mixer.Info arg2) {
                 client = new TranscribeStreamingClientWrapper(getSelectedAudioInput());
-                synchronousClient = new TranscribeStreamingSynchronousClient(TranscribeStreamingClientWrapper.getClient());
+                synchronousClient = new TranscribeStreamingSynchronousClient(
+                        TranscribeStreamingClientWrapper.getClient());
             };
         });
 
@@ -201,10 +209,10 @@ public class FullScreenWindowController {
         bottomPane.setVgap(10);
         bottomPane.setHgap(10);
         bottomPane.setPadding(new Insets(25, 50, 50, 50));
-        fill = new BackgroundFill(Color.rgb(0, 177, 64), CornerRadii.EMPTY, Insets.EMPTY);
+        fill = new BackgroundFill(Color.hsb(180, 0, 0.18), CornerRadii.EMPTY, Insets.EMPTY);
         bottomPane.setBackground(new Background(fill));
         ObservableList<Node> list = bottomPane.getChildren();
-        
+
         outputText = new Text();
         outputText.setWrappingWidth(width);
         outputText.setText("");
@@ -213,8 +221,16 @@ public class FullScreenWindowController {
         outputText.setStroke(Color.BLACK);
         outputText.setStrokeWidth(2);
 
-        list.addAll(outputText);
-        
+        outputTranslation = new Text();
+        outputTranslation.setWrappingWidth(width);
+        outputTranslation.setText("");
+        outputTranslation.setFont(Font.font("Gill Sans MT", 90));
+        outputTranslation.setFill(Color.YELLOW);
+        outputTranslation.setStroke(Color.BLACK);
+        outputTranslation.setStrokeWidth(2);
+
+        list.addAll(outputText, outputTranslation);
+
         ObservableList<Node> rootList = rootPane.getChildren();
         rootList.addAll(startStopMicButton, exitButton, audioInputSelect, bottomPane);
     }
@@ -252,14 +268,17 @@ public class FullScreenWindowController {
     }
 
     /**
-     * A StartStreamTranscriptionResponseHandler class listens to events from Transcribe streaming service that return
-     * transcriptions, and decides what to do with them. This example displays the transcripts in the GUI window, and
+     * A StartStreamTranscriptionResponseHandler class listens to events from
+     * Transcribe streaming service that return
+     * transcriptions, and decides what to do with them. This example displays the
+     * transcripts in the GUI window, and
      * combines the transcripts together into a final transcript at the end.
      */
     private StreamTranscriptionBehavior getResponseHandlerForWindow() {
         return new StreamTranscriptionBehavior() {
 
-            //This will handle errors being returned from AWS Transcribe in your response. Here we just print the exception.
+            // This will handle errors being returned from AWS Transcribe in your response.
+            // Here we just print the exception.
             @Override
             public void onError(Throwable e) {
                 System.out.println(e.getMessage());
@@ -267,7 +286,7 @@ public class FullScreenWindowController {
                 while (cause != null) {
                     System.out.println("Caused by: " + cause.getMessage());
                     Arrays.stream(cause.getStackTrace()).forEach(l -> System.out.println("  " + l));
-                    if (cause.getCause() != cause) { //Look out for circular causes
+                    if (cause.getCause() != cause) { // Look out for circular causes
                         cause = cause.getCause();
                     } else {
                         cause = null;
@@ -277,34 +296,43 @@ public class FullScreenWindowController {
             }
 
             /*
-            This handles each event being received from the Transcribe service. In this example we are displaying the
-            transcript as it is updated, and when we receive a "final" transcript, we append it to our finalTranscript
-            which is returned at the end of the microphone streaming.
+             * This handles each event being received from the Transcribe service. In this
+             * example we are displaying the
+             * transcript as it is updated, and when we receive a "final" transcript, we
+             * append it to our finalTranscript
+             * which is returned at the end of the microphone streaming.
              */
             @Override
             public void onStream(TranscriptResultStream event) {
                 List<Result> results = ((TranscriptEvent) event).transcript().results();
-                if(results.size()>0) {
+                if (results.size() > 0) {
                     Result firstResult = results.get(0);
-                    if (firstResult.alternatives().size() > 0 && !firstResult.alternatives().get(0).transcript().isEmpty()) {
+                    if (firstResult.alternatives().size() > 0
+                            && !firstResult.alternatives().get(0).transcript().isEmpty()) {
                         String transcript = firstResult.alternatives().get(0).transcript();
-                        if(!transcript.isEmpty()) {
+                        if (!transcript.isEmpty()) {
                             // System.out.println(transcript);
                             String displayText;
                             if (!firstResult.isPartial()) {
                                 finalTranscript += transcript + " ";
-                                displayText = finalTranscript;
+                                finalTranslation += displayText = finalTranscript;
                             } else {
                                 displayText = finalTranscript + " " + transcript;
                             }
+                            String translation = translateClient.translate(displayText, "en", "es");
+                            // System.out.println(translation);
                             Platform.runLater(() -> {
                                 int maxLength = 100;
                                 if (displayText.length() > maxLength) {
                                     String newText = displayText.substring(displayText.length() - maxLength);
+                                    String newTranslationText = translation.substring(translation.length() - maxLength);
                                     // Break off word
                                     outputText.setText(newText.substring(newText.indexOf(" ")));
+                                    outputTranslation
+                                            .setText(newTranslationText.substring(newTranslationText.indexOf(" ")));
                                 } else {
                                     outputText.setText(displayText);
+                                    outputTranslation.setText(translation);
                                 }
                                 lastUpdatedTime = new Date();
                                 // outputTextArea.setScrollTop(Double.MAX_VALUE);
@@ -316,9 +344,11 @@ public class FullScreenWindowController {
             }
 
             /*
-            This handles the initial response from the AWS Transcribe service, generally indicating the streams have
-            successfully been opened. Here we just print that we have received the initial response and do some
-            UI updates.
+             * This handles the initial response from the AWS Transcribe service, generally
+             * indicating the streams have
+             * successfully been opened. Here we just print that we have received the
+             * initial response and do some
+             * UI updates.
              */
             @Override
             public void onResponse(StartStreamTranscriptionResponse r) {
@@ -331,31 +361,33 @@ public class FullScreenWindowController {
             }
 
             /*
-            This method is called when the stream is terminated without error. In our case we will use this opportunity
-            to display the final, total transcript we've been aggregating during the transcription period and activates
-            the save button.
+             * This method is called when the stream is terminated without error. In our
+             * case we will use this opportunity
+             * to display the final, total transcript we've been aggregating during the
+             * transcription period and activates
+             * the save button.
              */
             @Override
             public void onComplete() {
                 System.out.println("=== All records streamed successfully ===");
                 audioInputSelect.setDisable(false);
                 // Platform.runLater(() -> {
-                //     // finalTextArea.setText(finalTranscript);
-                //     // saveButton.setDisable(false);
-                //     // saveButton.setOnAction(__ -> {
-                //     //     FileChooser fileChooser = new FileChooser();
-                //     //     fileChooser.setTitle("Save Transcript");
-                //     //     File file = fileChooser.showSaveDialog(primaryStage);
-                //     //     if (file != null) {
-                //     //         try {
-                //     //             FileWriter writer = new FileWriter(file);
-                //     //             writer.write(finalTranscript);
-                //     //             writer.close();
-                //     //         } catch (IOException e) {
-                //     //             System.out.println("Error saving transcript to file: " + e);
-                //     //         }
-                //     //     }
-                //     // });
+                // // finalTextArea.setText(finalTranscript);
+                // // saveButton.setDisable(false);
+                // // saveButton.setOnAction(__ -> {
+                // // FileChooser fileChooser = new FileChooser();
+                // // fileChooser.setTitle("Save Transcript");
+                // // File file = fileChooser.showSaveDialog(primaryStage);
+                // // if (file != null) {
+                // // try {
+                // // FileWriter writer = new FileWriter(file);
+                // // writer.write(finalTranscript);
+                // // writer.close();
+                // // } catch (IOException e) {
+                // // System.out.println("Error saving transcript to file: " + e);
+                // // }
+                // // }
+                // // });
 
                 // });
             }

@@ -27,7 +27,12 @@
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>transcribestreaming</artifactId>
-      <version>2.7.27</version>
+      <version>2.21.27</version>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>translate</artifactId>
+      <version>2.21.27</version>
     </dependency>
     <!-- https://mvnrepository.com/artifact/org.reactivestreams/reactive-streams -->
     <dependency>
@@ -38,6 +43,11 @@
     <dependency>
       <groupId>org.openjfx</groupId>
       <artifactId>javafx-controls</artifactId>
+      <version>16</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-fxml</artifactId>
       <version>16</version>
     </dependency>
 
@@ -60,7 +70,7 @@
           </descriptorRefs>
           <archive>
             <manifest>
-              <mainClass>com.amazonaws.transcribestreaming.TranscribeStreamingDemoApp</mainClass>
+              <mainClass>org.thon.transcribestreaming.TranscribeStreamingDemoApp</mainClass>
             </manifest>
           </archive>
 
