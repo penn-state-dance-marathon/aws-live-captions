@@ -167,6 +167,9 @@ public class TranscribeStreamingRetryClient {
                 .mediaEncoding(request.mediaEncoding())
                 .mediaSampleRateHertz(request.mediaSampleRateHertz())
                 .sessionId(UUID.randomUUID().toString())
+                .vocabularyFilterMethod(VocabularyFilterMethod.REMOVE)
+                .vocabularyFilterName("profanity")
+                .vocabularyName("thon-weekend")
                 .build();
     }
 

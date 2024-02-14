@@ -24,6 +24,7 @@ import software.amazon.awssdk.services.transcribestreaming.model.Result;
 import software.amazon.awssdk.services.transcribestreaming.model.StartStreamTranscriptionRequest;
 import software.amazon.awssdk.services.transcribestreaming.model.StartStreamTranscriptionResponseHandler;
 import software.amazon.awssdk.services.transcribestreaming.model.TranscriptEvent;
+import software.amazon.awssdk.services.transcribestreaming.model.VocabularyFilterMethod;
 
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
@@ -58,6 +59,9 @@ public class TranscribeStreamingSynchronousClient {
                     .languageCode(LanguageCode.EN_US.toString())
                     .mediaEncoding(MediaEncoding.PCM)
                     .mediaSampleRateHertz(sampleRate)
+                    .vocabularyFilterMethod(VocabularyFilterMethod.REMOVE)
+                    .vocabularyFilterName("profanity")
+                    .vocabularyName("thon-weekend")
                     .build();
             AudioStreamPublisher audioStream = new AudioStreamPublisher(new FileInputStream(audioFile));
             StartStreamTranscriptionResponseHandler responseHandler = getResponseHandler();

@@ -249,7 +249,7 @@ public class TranscribeStreamingClientWrapper {
                 .mediaSampleRateHertz(mediaSampleRateHertz)
                 .vocabularyFilterMethod(VocabularyFilterMethod.REMOVE)
                 .vocabularyFilterName("profanity")
-                .vocabularyName("famcarn-test01")
+                .vocabularyName("thon-weekend")
                 .build();
     }
 
